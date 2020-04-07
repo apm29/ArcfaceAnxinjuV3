@@ -1,0 +1,2 @@
+rootProject.name='AnXinJu'
+include ':app',':dahuaipc', ':nfc' ,':data',':serial',':tpsutils',':qrcode', ':rs485reader'
