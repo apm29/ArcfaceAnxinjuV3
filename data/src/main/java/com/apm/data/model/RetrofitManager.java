@@ -12,7 +12,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-import okhttp3.internal.platform.Platform;
+import okhttp3.logging.HttpLoggingInterceptor;
 import retrofit2.Retrofit;
 import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
 import retrofit2.converter.gson.GsonConverterFactory;
@@ -35,15 +35,17 @@ public class RetrofitManager {
     private Retrofit retrofit;
 
     private RetrofitManager() {
-        retrofit = new Retrofit.Builder()
-                .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
-                .addConverterFactory(GsonConverterFactory.create())
-                .baseUrl("http://axj.ciih.net")
-                .client(
-                        new OkHttpClient.Builder()
-                                .connectTimeout(25, TimeUnit.SECONDS)
-                                .readTimeout(25, TimeUnit.SECONDS)
-                                .callTimeout(35,TimeUnit.SECONDS)
+        Retrofit.Builder builder = new Retrofit.Builder();
+        builder.addCallAdapterFactory(RxJava2CallAdapterFactory.create());
+        builder.addConverterFactory(GsonConverterFactory.create());
+        builder.baseUrl("http://axj.ciih.net");
+        HttpLoggingInterceptor interceptor = new HttpLoggingInterceptor();
+        interceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
+        builder.client(
+                new OkHttpClient.Builder()
+                        .connectTimeout(25, TimeUnit.SECONDS)
+                        .readTimeout(25, TimeUnit.SECONDS)
+                        .callTimeout(35, TimeUnit.SECONDS)
 //                                .addInterceptor(
 //                                        new LoggingInterceptor.Builder()
 //                                                .setLevel(Level.BASIC)
@@ -53,24 +55,26 @@ public class RetrofitManager {
 //                                                .response("RESPONSE:")
 //                                                .build()
 //                                )
-                                .addInterceptor(new Interceptor() {
-                                    @Override
-                                    public Response intercept(Chain chain) throws IOException {
-                                        Request oldReq = chain.request();
-                                        if ("POST".equalsIgnoreCase(oldReq.method())){
-                                            RequestBody body = oldReq.body();
-                                            if (body instanceof FormBody){
-                                                FormBody formBody = (FormBody) body;
-                                                for (int i = 0; i < formBody.size(); i++) {
-                                                    System.out.println(formBody.name(i)+":"+formBody.value(i));
-                                                }
-                                            }
+                        .addInterceptor(new Interceptor() {
+                            @Override
+                            public Response intercept(Chain chain) throws IOException {
+                                Request oldReq = chain.request();
+                                if ("POST".equalsIgnoreCase(oldReq.method())) {
+                                    RequestBody body = oldReq.body();
+                                    if (body instanceof FormBody) {
+                                        FormBody formBody = (FormBody) body;
+                                        for (int i = 0; i < formBody.size(); i++) {
+                                            System.out.println(formBody.name(i) + ":" + formBody.value(i));
                                         }
-                                        return chain.proceed(oldReq);
                                     }
-                                })
-                                .build()
-                )
+                                }
+                                return chain.proceed(oldReq);
+                            }
+                        })
+                        .addNetworkInterceptor(interceptor)
+                        .build()
+        );
+        retrofit = builder
                 .build();
     }
 

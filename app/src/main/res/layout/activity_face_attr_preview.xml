@@ -16,4 +16,41 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <include
+        android:id="@+id/layout_keyboard"
+        layout="@layout/layout_keyboard"
+        android:layout_margin="25dp"
+        android:layout_marginTop="75dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        tools:visibility="visible"
+        android:layout_gravity="center"
+        app:layout_constraintBottom_toBottomOf="@+id/textureView"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/textureView" />
+    <Button
+        android:text="扫描二维码"
+        android:id="@+id/qrCode"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_margin="10dp"
+        android:padding="30dp"
+        android:textColor="@color/white"
+        android:layout_gravity="bottom"
+        android:background="@drawable/bt_set_round"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+    <TextView
+        android:id="@+id/mTipText"
+        android:layout_width="wrap_content"
+        android:layout_gravity="center"
+        android:visibility="gone"
+        tools:text="123"
+        android:textColor="@color/red"
+        tools:visibility="visible"
+        android:textSize="50sp"
+        android:layout_height="wrap_content"/>
 </FrameLayout>

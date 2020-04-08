@@ -5,6 +5,8 @@ import android.graphics.Bitmap;
 import android.graphics.Rect;
 import android.util.Log;
 
+import com.apm29.anxinju.db.RoomDateBase;
+import com.apm29.anxinju.model.ArcUser;
 import com.apm29.anxinju.model.FaceRegisterInfo;
 import com.arcsoft.face.ErrorInfo;
 import com.arcsoft.face.FaceEngine;
@@ -377,6 +379,54 @@ public class FaceServer {
 
     }
 
+    public boolean extractFromBgr24(Context context, byte[] bgr24, int width, int height, FaceFeature faceFeature) {
+        synchronized (this) {
+            if (faceEngine == null || context == null || bgr24 == null || width % 4 != 0 || bgr24.length != width * height * 3) {
+                Log.e(TAG, "registerBgr24:  invalid params");
+                return false;
+            }
+
+            if (ROOT_PATH == null) {
+                ROOT_PATH = context.getFilesDir().getAbsolutePath();
+            }
+            //特征存储的文件夹
+            File featureDir = new File(ROOT_PATH + File.separator + SAVE_FEATURE_DIR);
+            if (!featureDir.exists() && !featureDir.mkdirs()) {
+                Log.e(TAG, "registerBgr24: can not create feature directory");
+                return false;
+            }
+            //图片存储的文件夹
+            File imgDir = new File(ROOT_PATH + File.separator + SAVE_IMG_DIR);
+            if (!imgDir.exists() && !imgDir.mkdirs()) {
+                Log.e(TAG, "registerBgr24: can not create image directory");
+                return false;
+            }
+            //人脸检测
+            List<FaceInfo> faceInfoList = new ArrayList<>();
+            int code = faceEngine.detectFaces(bgr24, width, height, FaceEngine.CP_PAF_BGR24, faceInfoList);
+            if (code == ErrorInfo.MOK && faceInfoList.size() > 0) {
+                //特征提取
+                code = faceEngine.extractFaceFeature(bgr24, width, height, FaceEngine.CP_PAF_BGR24, faceInfoList.get(0), faceFeature);
+                try {
+                    //保存注册结果（注册图、特征数据）
+                    if (code == ErrorInfo.MOK) {
+                        return true;
+                    } else {
+                        Log.e(TAG, "registerBgr24: extract face feature failed, code is " + code);
+                        return false;
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return false;
+                }
+            } else {
+                Log.e(TAG, "registerBgr24: no face detected, code is " + code);
+                return false;
+            }
+        }
+
+    }
+
     /**
      * 截取合适的头像并旋转，保存为注册头像
      *
@@ -466,6 +516,42 @@ public class FaceServer {
         isProcessing = false;
         if (maxSimilarIndex != -1) {
             return new CompareResult(faceRegisterInfoList.get(maxSimilarIndex).getName(), maxSimilar);
+        }
+        return null;
+    }
+
+    /**
+     * 在数据库中搜索
+     *
+     * @param faceFeature 传入特征数据
+     * @return 比对结果
+     */
+    public CompareResult compareInDatabase(FaceFeature faceFeature,Context context) {
+        if (faceEngine == null || isProcessing || faceFeature == null) {
+            return null;
+        }
+        FaceFeature tempFaceFeature = new FaceFeature();
+        FaceSimilar faceSimilar = new FaceSimilar();
+        float maxSimilar = 0;
+        int maxSimilarIndex = -1;
+        isProcessing = true;
+        List<ArcUser> users = RoomDateBase.Companion.getInstance(context).getUserDao().getUsers();
+        if(users == null || users.size() == 0 ){
+            isProcessing = false;
+            return null;
+        }
+        for (int i = 0; i < users.size(); i++) {
+            tempFaceFeature.setFeatureData(users.get(i).getFeature());
+            faceEngine.compareFaceFeature(faceFeature, tempFaceFeature, faceSimilar);
+            if (faceSimilar.getScore() > maxSimilar) {
+                maxSimilar = faceSimilar.getScore();
+                maxSimilarIndex = i;
+            }
+        }
+        isProcessing = false;
+        if (maxSimilarIndex != -1) {
+            ArcUser arcUser = users.get(maxSimilarIndex);
+            return new CompareResult(arcUser.getId(), arcUser.getUserId(), arcUser.getUserName(), maxSimilar);
         }
         return null;
     }

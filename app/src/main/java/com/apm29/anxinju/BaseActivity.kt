@@ -3,6 +3,7 @@ package com.apm29.anxinju
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
 import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -41,8 +42,6 @@ abstract class BaseActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
         val permissions = arrayOf(Manifest.permission.READ_PHONE_STATE, Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE)
         if (permissions.any { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }) {
             ActivityCompat.requestPermissions(this, permissions, 101)
@@ -133,9 +132,13 @@ abstract class BaseActivity : AppCompatActivity() {
         }
         return exists
     }
+    val handler = Handler()
 
     protected fun showToast(s: String?) {
-        Toast.makeText(applicationContext, s, Toast.LENGTH_SHORT).show()
+        handler.post {
+            Toast.makeText(applicationContext, s, Toast.LENGTH_SHORT).show()
+        }
     }
+
 
 }

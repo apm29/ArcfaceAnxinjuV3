@@ -11,7 +11,7 @@ class BitmapUtils private constructor(context: Context) {
         var instance: BitmapUtils? = null
 
         @JvmStatic
-        fun getInstance(context: Context) {
+        fun getInstance(context: Context): BitmapUtils {
             if (instance == null) {
                 synchronized(this) {
                     if (instance == null) {
@@ -19,6 +19,7 @@ class BitmapUtils private constructor(context: Context) {
                     }
                 }
             }
+            return instance!!
         }
     }
 

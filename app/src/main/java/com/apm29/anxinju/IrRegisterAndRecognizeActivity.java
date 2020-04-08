@@ -348,7 +348,7 @@ public class IrRegisterAndRecognizeActivity extends BaseActivity {
 
             //请求FR的回调
             @Override
-            public void onFaceFeatureInfoGet(@Nullable final FaceFeature faceFeature, final Integer requestId, final Integer errorCode) {
+            public void onFaceFeatureInfoGet(@Nullable final FaceFeature faceFeature, final Integer requestId, final Integer errorCode,final byte[] nv21) {
                 //FR成功
                 if (faceFeature != null) {
 //                    Log.i(TAG, "onPreview: fr end = " + System.currentTimeMillis() + " trackId = " + requestId);
@@ -377,7 +377,7 @@ public class IrRegisterAndRecognizeActivity extends BaseActivity {
 
                                         @Override
                                         public void onNext(Long aLong) {
-                                            onFaceFeatureInfoGet(faceFeature, requestId, errorCode);
+                                            onFaceFeatureInfoGet(faceFeature, requestId, errorCode,nv21);
                                         }
 
                                         @Override

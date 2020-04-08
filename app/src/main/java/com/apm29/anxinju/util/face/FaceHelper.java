@@ -137,7 +137,7 @@ public class FaceHelper {
             if (frEngine != null && frThreadQueue.remainingCapacity() > 0) {
                 frExecutor.execute(new FaceRecognizeRunnable(nv21, faceInfo, width, height, format, trackId));
             } else {
-                faceListener.onFaceFeatureInfoGet(null, trackId, ERROR_BUSY);
+                faceListener.onFaceFeatureInfoGet(null, trackId, ERROR_BUSY,null);
             }
         }
     }
@@ -204,12 +204,12 @@ public class FaceHelper {
         if (faceListener != null) {
             if (ftEngine != null) {
                 faceInfoList.clear();
-                long ftStartTime = System.currentTimeMillis();
+                //long ftStartTime = System.currentTimeMillis();
                 int code = ftEngine.detectFaces(nv21, previewSize.width, previewSize.height, FaceEngine.CP_PAF_NV21, faceInfoList);
                 if (code != ErrorInfo.MOK) {
                     faceListener.onFail(new Exception("ft failed,code is " + code));
                 } else {
-                    Log.i(TAG, "onPreviewFrame: ft costTime = " + (System.currentTimeMillis() - ftStartTime) + "ms");
+                    //Log.i(TAG, "onPreviewFrame: ft costTime = " + (System.currentTimeMillis() - ftStartTime) + "ms");
                 }
                 /*
                  * 若需要多人脸搜索，删除此行代码
@@ -264,13 +264,13 @@ public class FaceHelper {
                     }
                     if (frCode == ErrorInfo.MOK) {
                         Log.i(TAG, "run: fr costTime = " + (System.currentTimeMillis() - frStartTime) + "ms");
-                        faceListener.onFaceFeatureInfoGet(faceFeature, trackId, frCode);
+                        faceListener.onFaceFeatureInfoGet(faceFeature, trackId, frCode,nv21Data);
                     } else {
-                        faceListener.onFaceFeatureInfoGet(null, trackId, frCode);
+                        faceListener.onFaceFeatureInfoGet(null, trackId, frCode,nv21Data);
                         faceListener.onFail(new Exception("fr failed errorCode is " + frCode));
                     }
                 } else {
-                    faceListener.onFaceFeatureInfoGet(null, trackId, ERROR_FR_ENGINE_IS_NULL);
+                    faceListener.onFaceFeatureInfoGet(null, trackId, ERROR_FR_ENGINE_IS_NULL,null);
                     faceListener.onFail(new Exception("fr failed ,frEngine is null"));
                 }
             }

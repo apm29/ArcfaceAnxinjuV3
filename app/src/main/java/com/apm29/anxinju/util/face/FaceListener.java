@@ -25,7 +25,7 @@ public interface FaceListener {
      * @param requestId   请求码
      * @param errorCode   错误码
      */
-    void onFaceFeatureInfoGet(@Nullable FaceFeature faceFeature, Integer requestId, Integer errorCode);
+    void onFaceFeatureInfoGet(@Nullable FaceFeature faceFeature, Integer requestId, Integer errorCode,byte[] nv21);
 
     /**
      * 请求活体检测后的回调
