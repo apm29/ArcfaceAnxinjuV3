@@ -78,7 +78,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
     override val coroutineContext: CoroutineContext
         get() = Dispatchers.Main
     private var detectQrCode = false
-    lateinit var cameraHelper: CameraHelper
+    private lateinit var cameraHelper: CameraHelper
     lateinit var drawHelper: DrawHelper
     lateinit var previewSize: Camera.Size
     private val rgbCameraId: Int? = Camera.CameraInfo.CAMERA_FACING_BACK
@@ -247,28 +247,11 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
     }
 
     private fun saveBitmapForRFID(data: ByteArray) {
-        if (yuvType == null) {
-            yuvType = Type.Builder(rs, Element.U8(rs)).setX(data.size)
-            `in` = Allocation.createTyped(rs, yuvType!!.create(), Allocation.USAGE_SCRIPT)
-
-            rgbaType = Type.Builder(rs, Element.RGBA_8888(rs)).setX(PREFER_HEIGHT)
-                .setY(PREFER_WIDTH)
-            out = Allocation.createTyped(rs, rgbaType!!.create(), Allocation.USAGE_SCRIPT)
-        }
-        `in`!!.copyFrom(data)
-
-        yuvToRgbIntrinsic.setInput(`in`)
-        yuvToRgbIntrinsic.forEach(out)
-
-        val bmpout =
-            Bitmap.createBitmap(
-                PREFER_HEIGHT,
-                PREFER_WIDTH, Bitmap.Config.ARGB_8888
-            )
-        out!!.copyTo(bmpout)
+        val bitmap = getCropImage(data, previewSize.width,
+            previewSize.height, FaceEngine.ASF_OC_90)
         if (mBinder != null) {
             try {
-                mBinder?.setPicture(bmpout)
+                mBinder?.setPicture(bitmap)
             } catch (e: Throwable) {
 
             }
@@ -529,7 +512,11 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                     return
                 }
                 rgbData = nv21
-                processPreviewData()
+                try {
+                    processPreviewData()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 val ageInfoList: List<AgeInfo> = ArrayList()
                 val genderInfoList: List<GenderInfo> =
                     ArrayList()
