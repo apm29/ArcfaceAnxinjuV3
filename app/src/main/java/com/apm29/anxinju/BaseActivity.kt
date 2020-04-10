@@ -13,7 +13,6 @@ import com.apm29.anxinju.common.Constants
 import com.arcsoft.face.ActiveFileInfo
 import com.arcsoft.face.ErrorInfo
 import com.arcsoft.face.FaceEngine
-import com.bumptech.glide.Glide.init
 import io.reactivex.Observable
 import io.reactivex.ObservableOnSubscribe
 import io.reactivex.Observer

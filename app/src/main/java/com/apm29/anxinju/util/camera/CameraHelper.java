@@ -90,7 +90,6 @@ public class CameraHelper implements Camera.PreviewCallback {
             try {
                 Camera.Parameters parameters = mCamera.getParameters();
                 parameters.setPreviewFormat(ImageFormat.NV21);
-
                 //预览大小设置
                 previewSize = parameters.getPreviewSize();
                 List<Camera.Size> supportedPreviewSizes = parameters.getSupportedPreviewSizes();

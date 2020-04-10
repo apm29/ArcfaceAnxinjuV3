@@ -1,7 +1,8 @@
 package com.apm.data.model;
 
-//import com.ihsanbal.logging.Level;
-//import com.ihsanbal.logging.LoggingInterceptor;
+
+import com.ihsanbal.logging.Level;
+import com.ihsanbal.logging.LoggingInterceptor;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -12,7 +13,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-import okhttp3.logging.HttpLoggingInterceptor;
+import okhttp3.internal.platform.Platform;
 import retrofit2.Retrofit;
 import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
 import retrofit2.converter.gson.GsonConverterFactory;
@@ -39,22 +40,21 @@ public class RetrofitManager {
         builder.addCallAdapterFactory(RxJava2CallAdapterFactory.create());
         builder.addConverterFactory(GsonConverterFactory.create());
         builder.baseUrl("http://axj.ciih.net");
-        HttpLoggingInterceptor interceptor = new HttpLoggingInterceptor();
-        interceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
         builder.client(
                 new OkHttpClient.Builder()
-                        .connectTimeout(25, TimeUnit.SECONDS)
-                        .readTimeout(25, TimeUnit.SECONDS)
-                        .callTimeout(35, TimeUnit.SECONDS)
-//                                .addInterceptor(
-//                                        new LoggingInterceptor.Builder()
-//                                                .setLevel(Level.BASIC)
-//                                                .loggable(true)
-//                                                .log(Platform.WARN)
-//                                                .request("REQUEST:")
-//                                                .response("RESPONSE:")
-//                                                .build()
-//                                )
+                        .connectTimeout(125, TimeUnit.SECONDS)
+                        .readTimeout(125, TimeUnit.SECONDS)
+                        .callTimeout(125, TimeUnit.SECONDS)
+                        .writeTimeout(125, TimeUnit.SECONDS)
+                        .addInterceptor(
+                                new LoggingInterceptor.Builder()
+                                        .setLevel(Level.BASIC)
+                                        .loggable(true)
+                                        .log(Platform.WARN)
+                                        .request("REQUEST:")
+                                        .response("RESPONSE:")
+                                        .build()
+                        )
                         .addInterceptor(new Interceptor() {
                             @Override
                             public Response intercept(Chain chain) throws IOException {
@@ -71,7 +71,6 @@ public class RetrofitManager {
                                 return chain.proceed(oldReq);
                             }
                         })
-                        .addNetworkInterceptor(interceptor)
                         .build()
         );
         retrofit = builder

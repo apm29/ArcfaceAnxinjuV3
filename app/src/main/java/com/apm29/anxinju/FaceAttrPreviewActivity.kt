@@ -2,9 +2,7 @@ package com.apm29.anxinju
 
 import android.annotation.SuppressLint
 import android.app.Service
-import android.content.ComponentName
-import android.content.Intent
-import android.content.ServiceConnection
+import android.content.*
 import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
 import android.graphics.Point
@@ -30,6 +28,7 @@ import com.apm.data.model.RetrofitManager
 import com.apm.data.persistence.PropertiesUtils
 import com.apm.rs485reader.service.DataSyncService
 import com.apm.rs485reader.service.IPictureCaptureInterface
+import com.apm.rs485reader.service.RFIDSyncAndListenService
 import com.apm29.anxinju.faceserver.CompareResult
 import com.apm29.anxinju.faceserver.FaceServer
 import com.apm29.anxinju.model.DrawInfo
@@ -53,6 +52,8 @@ import com.arcsoft.imageutil.ArcSoftImageUtil
 import com.arcsoft.imageutil.ArcSoftImageUtilError
 import com.arcsoft.imageutil.ArcSoftRotateDegree
 import com.common.pos.api.util.PosUtil
+import com.spark.zj.comcom.serial.lastSixHex
+import com.spark.zj.comcom.serial.toHexString
 import io.reactivex.Observable
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
@@ -60,6 +61,7 @@ import io.reactivex.schedulers.Schedulers
 import kotlinx.android.synthetic.main.activity_face_attr_preview.*
 import kotlinx.coroutines.*
 import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import java.io.File
@@ -85,6 +87,9 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
     lateinit var ftEngine: FaceEngine
     lateinit var frEngine: FaceEngine
     lateinit var faceHelper: FaceHelper
+    private val apiKt: ApiKt by lazy {
+        RetrofitManager.getInstance().retrofit.create(ApiKt::class.java)
+    }
 
     @Volatile
     private var rgbData: ByteArray? = null
@@ -198,66 +203,73 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
         startService(service)
 
         //射频id同步
-        val syncService = Intent(this, DataSyncService::class.java)
-        syncService.putExtra(DataSyncService.DEVICE_ID, deviceId)
-        //19BC95DC053A2A4D130FC17C9B4E6EED43
+//        val syncService = Intent(this, DataSyncService::class.java)
+//        syncService.putExtra(DataSyncService.DEVICE_ID, deviceId)
+//        //19BC95DC053A2A4D130FC17C9B4E6EED43
+//        startService(syncService)
+        val syncService = Intent(this, RFIDSyncAndListenService::class.java)
+        syncService.putExtra(RFIDSyncAndListenService.DEVICE_ID, deviceId)
         startService(syncService)
 
+        registerReceiver(
+            object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    intent?.apply {
+                        val bikeId =
+                            this.getStringExtra(RFIDSyncAndListenService.ACTION_KEY_HEX_STRING)
+                        if (bikeId != null) {
+                            showTip(bikeId)
+                            letGo()
+                            launch(threadContext) {
+                                sendBikeEntryLog(bikeId)
+                            }
+                        }
+                    }
+
+                }
+
+            }, IntentFilter(
+                RFIDSyncAndListenService.ACTION_SIGNAL_OPEN
+            )
+        )
+
     }
 
-    private var mBinder: IPictureCaptureInterface? = null
-    private val serviceConnection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName, service: IBinder) {
-            mBinder = IPictureCaptureInterface.Stub.asInterface(service)
+    private suspend fun sendBikeEntryLog(bikeId: String) {
+        try {
+            val tempFile = File(
+                getTempDirectory(),
+                "image_captured_${System.currentTimeMillis()}.jpg"
+            )
+            val image = saveImageFile(tempFile, nv21DataOfCurrentFrame, PREFER_WIDTH, PREFER_HEIGHT) ?: return
+            val apiKt = RetrofitManager.getInstance().retrofit.create(ApiKt::class.java)
+            val uploadFile = apiKt.uploadFile(
+                MultipartBody
+                    .Builder()
+                    .addFormDataPart(
+                        "file",
+                        image.name,
+                        RequestBody.create("multipart/form-data".toMediaTypeOrNull(), image)
+                    )
+                    .build()
+            )
+            apiKt.addEBikePassLog(
+                bikeId,
+                deviceId,
+                uploadFile.data.filePath
+            )
+            Log.d(TAG, "电动车日志上传成功")
+        } catch (e: Exception) {
+            Log.d(TAG, "电动车日志上传失败")
+            e.printStackTrace()
         }
-
-        override fun onServiceDisconnected(name: ComponentName) {
-
-        }
     }
-
-    override fun onStart() {
-        super.onStart()
-        val syncService = Intent(this, DataSyncService::class.java)
-        syncService.putExtra(DataSyncService.DEVICE_ID, deviceId)
-        bindService(syncService, serviceConnection, Service.BIND_AUTO_CREATE)
-    }
-
 
     override fun onPause() {
         super.onPause()
         startActivity(Intent(this, FaceAttrPreviewActivity::class.java))
     }
 
-    override fun onStop() {
-        super.onStop()
-        unbindService(serviceConnection)
-    }
-
-
-    var `in`: Allocation? = null
-    var out: Allocation? = null
-    var yuvType: Type.Builder? = null
-    var rgbaType: Type.Builder? = null
-    private val rs: RenderScript by lazy {
-        RenderScript.create(this)
-    }
-    private val yuvToRgbIntrinsic: ScriptIntrinsicYuvToRGB by lazy {
-        ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs))
-    }
-
-    private fun saveBitmapForRFID(data: ByteArray) {
-        val bitmap = getCropImage(data, previewSize.width,
-            previewSize.height, FaceEngine.ASF_OC_90)
-        if (mBinder != null) {
-            try {
-                mBinder?.setPicture(bitmap)
-            } catch (e: Throwable) {
-
-            }
-
-        }
-    }
 
     private fun unInitEngine() {
         if (afCode == 0) {
@@ -322,7 +334,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
 
 
     private val threadContext: CoroutineContext =
-        Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+        Executors.newFixedThreadPool(6).asCoroutineDispatcher()
 
     private fun initCamera() {
         val metrics = DisplayMetrics()
@@ -447,12 +459,6 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                 if (faceRectView != null) {
                     faceRectView!!.clearFaceInfo()
                 }
-
-                try {
-                    saveBitmapForRFID(nv21)
-                } finally {
-
-                }
                 nv21DataOfCurrentFrame = nv21.clone()
                 if (detectQrCode) {
                     launch(threadContext) {
@@ -497,8 +503,8 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                     if (detectQrCode) {
                         drawInfoList.add(
                             DrawInfo(
-                                rect =  Rect(
-                                    100,280,540,680
+                                rect = Rect(
+                                    100, 280, 540, 680
                                 ),
                                 age = 0,
                                 liveness = 0,
@@ -556,7 +562,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                         drawInfoList.add(
                             DrawInfo(
                                 rect = Rect(
-                                    100,280,540,680
+                                    100, 280, 540, 680
                                 ),
                                 age = 0,
                                 liveness = 0,
@@ -819,7 +825,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                     .addFormDataPart(
                         "file",
                         image.name,
-                        RequestBody.create(MediaType.parse("multipart/form-data"), image)
+                        RequestBody.create("multipart/form-data".toMediaTypeOrNull(), image)
                     )
                     .build()
             )
@@ -881,7 +887,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                     .addFormDataPart(
                         "pic",
                         image.name,
-                        RequestBody.create(MediaType.parse("multipart/form-data"), image)
+                        RequestBody.create("multipart/form-data".toMediaTypeOrNull(), image)
                     )
                     .addFormDataPart("gateId", deviceId)
                     .build()
@@ -1029,7 +1035,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                     "pic",
                     image.name,
                     RequestBody.create(
-                        MediaType.parse("multipart/form-data"),
+                        "multipart/form-data".toMediaTypeOrNull(),
                         image
                     )
                 )

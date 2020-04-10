@@ -31,6 +31,7 @@
         </receiver>
         <service android:name=".service.FaceDataSyncService" android:process=":arc"/>
         <service android:name="com.apm.rs485reader.service.DataSyncService" android:process=":rfid"/>
+        <service android:name="com.apm.rs485reader.service.RFIDSyncAndListenService" android:process=":rfid"/>
         <service android:name=".service.KeepAliveService" />
     </application>
 
