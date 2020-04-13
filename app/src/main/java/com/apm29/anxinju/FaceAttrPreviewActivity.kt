@@ -403,7 +403,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                                         if (!detectQrCode)
                                             showKeyCodeIME()
                                     }
-                                    val image = NvDataHelper.getFrameImageFile()
+                                    val image = NvDataHelper.getFrameImageFile(withFace = true)
                                     if (image != null) {
                                         recordTempVisitorFace(image)
                                     }
@@ -479,6 +479,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                     if (code != ErrorInfo.MOK) {
                         return
                     }
+                    NvDataHelper.saveNv21DataWithFace(nv21)
                 } else {
                     val drawInfoList: MutableList<DrawInfo> =
                         ArrayList()
@@ -660,7 +661,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
         userId: String?
     ) {
         println("YJW:${Thread.currentThread()}")
-        val image = NvDataHelper.getFrameImageFile() ?: return
+        val image = NvDataHelper.getFrameImageFile(withFace = true) ?: return
         val apiKt = RetrofitManager.getInstance().retrofit.create(ApiKt::class.java)
         try {
             val uploadResp = apiKt.uploadFile(
@@ -864,7 +865,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
     //上传通行码通行的信息
     @SuppressLint("CheckResult")
     private suspend fun sendKeyPassInfo(passCode: String) {
-        val image = NvDataHelper.getFrameImageFile() ?: return
+        val image = NvDataHelper.getFrameImageFile(withFace = true) ?: return
         val api = RetrofitManager.getInstance().retrofit.create(ApiKt::class.java)
 
         val uploadResponse = api.uploadImageSync(

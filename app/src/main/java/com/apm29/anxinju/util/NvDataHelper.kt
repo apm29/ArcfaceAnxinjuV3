@@ -22,34 +22,40 @@ import kotlin.coroutines.CoroutineContext
  *  date : 2020/4/13 9:10 AM
  *  description :
  */
-object NvDataHelper : CoroutineScope{
+object NvDataHelper : CoroutineScope {
 
-    override val coroutineContext:CoroutineContext
+    override val coroutineContext: CoroutineContext
         get() = Dispatchers.Default
-    private var lastJob :Deferred<File?>? = null
+    private var lastJob: Deferred<File?>? = null
 
-    private var nv21:ByteArray = ByteArray(size = 0)
+    private var nv21: ByteArray = ByteArray(size = 0)
+    private var nv21WidthFace: ByteArray = ByteArray(size = 0)
     private var previewSize: Camera.Size? = null
 
-    suspend fun getFrameImageFile(width: Int = previewSize?.width?:640,height: Int = previewSize?.height?:480 ,file: File? = null): File? {
-            if(nv21.isEmpty()){
-                println("图片ByteArray为空")
-                return null
-            }
-            if (lastJob!=null && lastJob?.isCompleted == false){
-                return lastJob?.await()
-            }
-            lastJob = coroutineScope {
-                async {
-                    saveImageFile(file,nv21, width, height)
-                }
-            }
+    suspend fun getFrameImageFile(
+        width: Int = previewSize?.width ?: 640,
+        height: Int = previewSize?.height ?: 480,
+        file: File? = null,
+        withFace: Boolean = false
+    ): File? {
+        if (nv21.isEmpty()) {
+            println("图片ByteArray为空")
+            return null
+        }
+        if (lastJob != null && lastJob?.isCompleted == false) {
             return lastJob?.await()
+        }
+        lastJob = coroutineScope {
+            async {
+                saveImageFile(file, if (withFace) nv21WidthFace else nv21, width, height)
+            }
+        }
+        return lastJob?.await()
     }
 
     fun saveNv21Data(nv21: ByteArray) {
-        if(lastJob!=null && lastJob?.isCompleted == false){
-            Log.e("NvDataHelper","Skip Frame : ${System.currentTimeMillis()}")
+        if (lastJob != null && lastJob?.isCompleted == false) {
+            Log.e("NvDataHelper", "Skip Frame : ${System.currentTimeMillis()}")
             return
         }
         this.nv21 = nv21
@@ -70,7 +76,7 @@ object NvDataHelper : CoroutineScope{
         if (nv21 == null) {
             return null
         }
-        Log.e("NvDataHelper",Thread.currentThread().toString())
+        Log.e("NvDataHelper", Thread.currentThread().toString())
         val bitmap = getCropImage(nv21, width, height, FaceEngine.ASF_OC_90) ?: return null
         var fileOutputStream: FileOutputStream? = null
         val directory =
@@ -189,6 +195,14 @@ object NvDataHelper : CoroutineScope{
 
     fun setImageSize(previewSize: Camera.Size?) {
         this.previewSize = previewSize
+    }
+
+    fun saveNv21DataWithFace(nv21: ByteArray) {
+        if (lastJob != null && lastJob?.isCompleted == false) {
+            Log.e("NvDataHelper", "Skip Frame : ${System.currentTimeMillis()}")
+            return
+        }
+        this.nv21WidthFace = nv21
     }
 
 }
