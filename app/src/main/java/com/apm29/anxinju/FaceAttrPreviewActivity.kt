@@ -36,6 +36,7 @@ import com.apm29.anxinju.model.FacePreviewInfo
 import com.apm29.anxinju.service.FaceDataSyncService
 import com.apm29.anxinju.util.ConfigUtil
 import com.apm29.anxinju.util.DrawHelper
+import com.apm29.anxinju.util.NvDataHelper
 import com.apm29.anxinju.util.QRCodeUtils
 import com.apm29.anxinju.util.camera.CameraHelper
 import com.apm29.anxinju.util.camera.CameraListener
@@ -87,12 +88,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
     lateinit var ftEngine: FaceEngine
     lateinit var frEngine: FaceEngine
     lateinit var faceHelper: FaceHelper
-    private val apiKt: ApiKt by lazy {
-        RetrofitManager.getInstance().retrofit.create(ApiKt::class.java)
-    }
 
-    @Volatile
-    private var rgbData: ByteArray? = null
 
     private val deviceId by lazy {
         PropertiesUtils.getInstance().init()
@@ -236,12 +232,9 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
     }
 
     private suspend fun sendBikeEntryLog(bikeId: String) {
+        val image = (NvDataHelper.getFrameImageFile() ?: return)
         try {
-            val tempFile = File(
-                getTempDirectory(),
-                "image_captured_${System.currentTimeMillis()}.jpg"
-            )
-            val image = saveImageFile(tempFile, nv21DataOfCurrentFrame, PREFER_WIDTH, PREFER_HEIGHT) ?: return
+
             val apiKt = RetrofitManager.getInstance().retrofit.create(ApiKt::class.java)
             val uploadFile = apiKt.uploadFile(
                 MultipartBody
@@ -262,6 +255,10 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
         } catch (e: Exception) {
             Log.d(TAG, "电动车日志上传失败")
             e.printStackTrace()
+        } finally {
+            if (image.exists()) {
+                image.delete()
+            }
         }
     }
 
@@ -326,12 +323,6 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
 
     }
 
-    //上次记录时间
-    private var lastRecordTimeMillis: Long = 0
-    private fun afterSeconds(second: Int): Boolean {
-        return System.currentTimeMillis() - lastRecordTimeMillis > 1000 * second
-    }
-
 
     private val threadContext: CoroutineContext =
         Executors.newFixedThreadPool(6).asCoroutineDispatcher()
@@ -351,6 +342,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                     "onCameraOpened: $cameraId  $displayOrientation $isMirror"
                 )
                 previewSize = camera.parameters.previewSize
+                NvDataHelper.setImageSize(previewSize)
                 if (!::drawHelper.isInitialized)
                     drawHelper = DrawHelper(
                         previewSize.width,
@@ -397,10 +389,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                                     sendEnterLog(
                                         compareResult.id,
                                         compareResult.userName,
-                                        compareResult.userId,
-                                        nv21,
-                                        previewSize.width,
-                                        previewSize.height
+                                        compareResult.userId
                                     )
                                 }
                                 hideKeyboard(0)
@@ -414,14 +403,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                                         if (!detectQrCode)
                                             showKeyCodeIME()
                                     }
-                                    val tempFile = File(
-                                        getTempDirectory(),
-                                        "image_captured.jpg"
-                                    )
-                                    val image = saveImageFile(
-                                        tempFile, nv21, previewSize.width,
-                                        previewSize.height
-                                    )
+                                    val image = NvDataHelper.getFrameImageFile()
                                     if (image != null) {
                                         recordTempVisitorFace(image)
                                     }
@@ -459,13 +441,13 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                 if (faceRectView != null) {
                     faceRectView!!.clearFaceInfo()
                 }
-                nv21DataOfCurrentFrame = nv21.clone()
+                NvDataHelper.saveNv21Data(nv21)
                 if (detectQrCode) {
                     launch(threadContext) {
                         val qrcode = QRCodeUtils.decodeWithImage(
                             nv21,
-                            640,
-                            480
+                            previewSize.width,
+                            previewSize.height
                         )
                         if (qrcode != null) {
                             detectQrCode = false
@@ -517,9 +499,8 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                     drawHelper.draw(faceRectView, drawInfoList)
                     return
                 }
-                rgbData = nv21
                 try {
-                    processPreviewData()
+                    processPreviewData(nv21)
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
@@ -636,14 +617,13 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
         private const val TAG = "FaceAttrPreviewActivity"
     }
 
-    var nv21DataOfCurrentFrame: ByteArray? = null
 
     /**
      * 处理预览数据
      */
     @Synchronized
-    private fun processPreviewData() {
-        rgbData?.apply {
+    private fun processPreviewData(rgbData:ByteArray) {
+        rgbData.apply {
             val cloneNv21Rgb: ByteArray = this.clone()
             if (faceRectView != null) {
                 faceRectView!!.clearFaceInfo()
@@ -670,154 +650,17 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                     }
                 }
             }
-            rgbData = null
         }
     }
 
-    /**
-     * 截取合适的头像并旋转
-     *
-     * @param originImageData 原始的BGR24数据
-     * @param width           BGR24图像宽度
-     * @param height          BGR24图像高度
-     * @param orient          人脸角度
-     * @param cropRect        裁剪的位置
-     * @param imageFormat     图像格式
-     * @return 头像的图像数据
-     */
-    private fun getCropImage(
-        originImageData: ByteArray,
-        width: Int,
-        height: Int,
-        orient: Int,
-        cropRect: Rect = Rect(0, 0, width, height)
-    ): Bitmap? {
-        val headImageData =
-            ArcSoftImageUtil.createImageData(
-                cropRect.width(),
-                cropRect.height(),
-                ArcSoftImageFormat.NV21
-            )
-        val cropCode = ArcSoftImageUtil.cropImage(
-            originImageData,
-            headImageData,
-            width,
-            height,
-            cropRect,
-            ArcSoftImageFormat.NV21
-        )
-        if (cropCode != ArcSoftImageUtilError.CODE_SUCCESS) {
-            throw RuntimeException("crop image failed, code is $cropCode")
-        }
-
-        //判断人脸旋转角度，若不为0度则旋转注册图
-        var rotateHeadImageData: ByteArray? = null
-        val rotateCode: Int
-        val cropImageWidth: Int
-        val cropImageHeight: Int
-        // 90度或270度的情况，需要宽高互换
-        if (orient == FaceEngine.ASF_OC_90 || orient == FaceEngine.ASF_OC_270) {
-            cropImageWidth = cropRect.height()
-            cropImageHeight = cropRect.width()
-        } else {
-            cropImageWidth = cropRect.width()
-            cropImageHeight = cropRect.height()
-        }
-        var rotateDegree: ArcSoftRotateDegree? = null
-        when (orient) {
-            FaceEngine.ASF_OC_90 -> rotateDegree = ArcSoftRotateDegree.DEGREE_270
-            FaceEngine.ASF_OC_180 -> rotateDegree = ArcSoftRotateDegree.DEGREE_180
-            FaceEngine.ASF_OC_270 -> rotateDegree = ArcSoftRotateDegree.DEGREE_90
-            FaceEngine.ASF_OC_0 -> rotateHeadImageData = headImageData
-            else -> rotateHeadImageData = headImageData
-        }
-        // 非0度的情况，旋转图像
-        if (rotateDegree != null) {
-            rotateHeadImageData = ByteArray(headImageData.size)
-            rotateCode = ArcSoftImageUtil.rotateImage(
-                headImageData,
-                rotateHeadImageData,
-                cropRect.width(),
-                cropRect.height(),
-                rotateDegree,
-                ArcSoftImageFormat.NV21
-            )
-            if (rotateCode != ArcSoftImageUtilError.CODE_SUCCESS) {
-                throw RuntimeException("rotate image failed, code is $rotateCode")
-            }
-        }
-        // 将创建一个Bitmap，并将图像数据存放到Bitmap中
-        val headBmp = Bitmap.createBitmap(
-            cropImageWidth,
-            cropImageHeight,
-            Bitmap.Config.RGB_565
-        )
-        if (ArcSoftImageUtil.imageDataToBitmap(
-                rotateHeadImageData,
-                headBmp,
-                ArcSoftImageFormat.NV21
-            ) != ArcSoftImageUtilError.CODE_SUCCESS
-        ) {
-            throw RuntimeException("failed to transform image data to bitmap")
-        }
-        return headBmp
-    }
-
-    private fun saveImageFile(file: File?, nv21: ByteArray?, width: Int, height: Int): File? {
-        if (nv21 == null) {
-            return null
-        }
-        val bitmap = getCropImage(nv21, width, height, FaceEngine.ASF_OC_90) ?: return null
-        var fileOutputStream: FileOutputStream? = null
-        val directory =
-            getTempDirectory()
-        val image: File
-        image = file ?: File(directory, "img_captured.jpg")
-        try {
-
-            fileOutputStream = FileOutputStream(image)
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fileOutputStream)
-            fileOutputStream.flush()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        } finally {
-            if (fileOutputStream != null) {
-                try {
-                    fileOutputStream.close()
-                } catch (e: IOException) {
-                    e.printStackTrace()
-                }
-
-            }
-        }
-        return image
-    }
-
-    private fun getTempDirectory(): File {
-        val sdRootFile = Environment.getExternalStorageDirectory()
-        val batchImageDir = File(sdRootFile, "Arc-Face-Temp")
-        if (sdRootFile.exists()) {
-            if (!batchImageDir.exists()) {
-                batchImageDir.mkdirs()
-            }
-        }
-        return batchImageDir
-    }
 
     private suspend fun sendEnterLog(
         id: Int,
         userName: String?,
-        userId: String?,
-        nv21: ByteArray?,
-        width: Int,
-        height: Int
+        userId: String?
     ) {
         println("YJW:${Thread.currentThread()}")
-        val tempFile = File(
-            getTempDirectory(),
-            "image_captured_${System.currentTimeMillis()}.jpg"
-        )
-        val image = saveImageFile(tempFile, nv21, width, height) ?: return
+        val image = NvDataHelper.getFrameImageFile() ?: return
         val apiKt = RetrofitManager.getInstance().retrofit.create(ApiKt::class.java)
         try {
             val uploadResp = apiKt.uploadFile(
@@ -852,7 +695,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                     Environment.getExternalStorageDirectory(),
                     "${System.currentTimeMillis()}_log.jpg"
                 )
-                tempFile.copyTo(logFile, overwrite = true)
+                image.copyTo(logFile, overwrite = true)
             }
 
             FaceDBManager.getInstance(this).getLogDao().addLog(
@@ -870,8 +713,8 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
             Log.e(TAG, "上传日志失败")
             e.printStackTrace()
         } finally {
-            if (tempFile.exists())
-                tempFile.delete()
+            if (image.exists())
+                image.delete()
         }
 
 
@@ -921,6 +764,10 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
             )
         } catch (e: Exception) {
             e.printStackTrace()
+        } finally {
+            if (image.exists()) {
+                image.delete()
+            }
         }
 
     }
@@ -1017,16 +864,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
     //上传通行码通行的信息
     @SuppressLint("CheckResult")
     private suspend fun sendKeyPassInfo(passCode: String) {
-        val tempFile = File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
-            "image_captured.jpg"
-        )
-        val image =
-            saveImageFile(tempFile, nv21DataOfCurrentFrame, previewSize.width, previewSize.height)
-        if (image == null) {
-            println("图片为空")
-            return
-        }
+        val image = NvDataHelper.getFrameImageFile() ?: return
         val api = RetrofitManager.getInstance().retrofit.create(ApiKt::class.java)
 
         val uploadResponse = api.uploadImageSync(
@@ -1074,7 +912,9 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
             )
             image.copyTo(logFile, overwrite = true)
         }
-
+        if (image.exists()) {
+            image.delete()
+        }
         FaceDBManager.getInstance(this).getLogDao().addLog(
             PassageLog(
                 uploadTime = Date(),

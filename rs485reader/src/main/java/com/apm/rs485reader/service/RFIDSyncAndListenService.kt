@@ -223,7 +223,6 @@ class RFIDSyncAndListenService : Service() {
                         TAG,
                         "获取远端数据成功 size: ${response.data.size} \r\n[${response.data.joinToString()}]"
                     )
-                    notifyPreviewActivity("hello")
                     response.data.forEach { model ->
                         try {
                             if (!model.delete) {

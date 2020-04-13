@@ -12,7 +12,7 @@ import com.apm29.anxinju.model.ArcUser
  *  date : 2020/4/8 8:55 AM
  *  description :
  */
-@Database(entities = [ArcUser::class],  version = 4)
+@Database(entities = [ArcUser::class],  version = 4,exportSchema = false)
 abstract class RoomDateBase: RoomDatabase() {
 
     companion object {
