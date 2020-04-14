@@ -155,7 +155,7 @@ class RFIDSyncAndListenService : Service() {
 
 
     private fun startSelfWithNotification() {
-        val intent = Intent(this, DataSyncService::class.java)
+        val intent = Intent(this, RFIDSyncAndListenService::class.java)
         intent.putExtra("show", 2)
         val builder = Notification.Builder(this)
             .setContentIntent(PendingIntent.getService(this, REQUEST_CODE, intent, 0))

@@ -26,8 +26,6 @@ import com.apm.data.db.entity.PassageLog
 import com.apm.data.model.BaseResponse
 import com.apm.data.model.RetrofitManager
 import com.apm.data.persistence.PropertiesUtils
-import com.apm.rs485reader.service.DataSyncService
-import com.apm.rs485reader.service.IPictureCaptureInterface
 import com.apm.rs485reader.service.RFIDSyncAndListenService
 import com.apm29.anxinju.faceserver.CompareResult
 import com.apm29.anxinju.faceserver.FaceServer

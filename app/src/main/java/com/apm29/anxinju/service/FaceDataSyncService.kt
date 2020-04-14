@@ -9,7 +9,6 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.apm.data.persistence.PropertiesUtils
-import com.apm.rs485reader.service.DataSyncService
 import com.apm29.anxinju.FaceAttrPreviewActivity
 import com.apm29.anxinju.common.Constants
 import com.apm29.anxinju.faceserver.FaceServer
