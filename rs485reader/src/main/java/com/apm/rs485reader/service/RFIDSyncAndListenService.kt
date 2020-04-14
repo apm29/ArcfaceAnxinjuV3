@@ -11,6 +11,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.apm.data.api.Api
 import com.apm.data.api.ApiKt
+import com.apm.data.db.FaceDBManager
 import com.apm.data.db.GateDataBase
 import com.apm.data.db.entity.User
 import com.apm.data.model.RetrofitManager
@@ -205,13 +206,13 @@ class RFIDSyncAndListenService : Service() {
     private fun startSyncLoop() {
         dispose(loopDisposable)
 
-
+        val syncDao = FaceDBManager.getInstance(this).getSyncDao()
         loopDisposable = Observable.interval(
             30_000, 30_000, TimeUnit.MILLISECONDS, Schedulers.io()
         )
             .flatMap {
                 val lastSyncTime =
-                    simpleDateFormat.format(Date(sharedPreferences.getLong(LAST_SYNC_TIME, 0)))
+                    simpleDateFormat.format(syncDao.getRFIDLastSyncTime())
                 Log.d(TAG, "last sync time: $lastSyncTime")
                 api.getNotSyncRFID(
                     lastSyncTime, simpleDateFormat.format(Date()), deviceId
@@ -261,9 +262,7 @@ class RFIDSyncAndListenService : Service() {
             .subscribe(
                 {
                     Log.d(TAG, "数据库条数: ${dataBase.getGateDao().getAll().size}")
-                    sharedPreferences.edit()
-                        .putLong(LAST_SYNC_TIME, Date().time)
-                        .apply()
+                    syncDao.resetRFIDLastSyncTime(System.currentTimeMillis() - 30_000)
                 }
                 ,
                 {
