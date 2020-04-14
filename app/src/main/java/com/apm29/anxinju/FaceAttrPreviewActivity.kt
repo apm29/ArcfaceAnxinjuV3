@@ -14,6 +14,7 @@ import android.os.Environment
 import android.os.Handler
 import android.util.DisplayMetrics
 import android.util.Log
+import android.view.TextureView
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
@@ -51,10 +52,7 @@ import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
 import kotlinx.android.synthetic.main.activity_face_attr_preview.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -111,8 +109,13 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
     /**
      * 相机预览显示的控件，可为SurfaceView或TextureView
      */
-    private var previewView: View? = null
-    private var faceRectView: FaceRectView? = null
+    private val previewView: TextureView by lazy {
+        findViewById<TextureView>(R.id.texture_preview)
+    }
+    private val faceRectView: FaceRectView by lazy {
+        findViewById<FaceRectView>(R.id.face_rect_view)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_face_attr_preview)
@@ -124,10 +127,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
 
         // Activity启动后就锁定为启动时的方向
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LOCKED
-        previewView = findViewById(R.id.texture_preview)
-        faceRectView = findViewById(R.id.face_rect_view)
         hideUi()
-
         qrCode.setOnClickListener {
             detectQrCode = true
             showTip("请将二维码对准扫描区域")
@@ -338,8 +338,8 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                     drawHelper = DrawHelper(
                         previewSize.width,
                         previewSize.height,
-                        previewView!!.width,
-                        previewView!!.height,
+                        previewView.width,
+                        previewView.height,
                         displayOrientation,
                         cameraId,
                         isMirror,
@@ -428,9 +428,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                 nv21: ByteArray,
                 camera: Camera
             ) {
-                if (faceRectView != null) {
-                    faceRectView!!.clearFaceInfo()
-                }
+                faceRectView.clearFaceInfo()
                 NvDataHelper.saveNv21Data(nv21)
                 if (detectQrCode) {
                     launch(threadContext) {
@@ -511,41 +509,39 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                 if (ageCode or genderCode or face3DAngleCode or livenessCode != ErrorInfo.MOK) {
                     return
                 }
-                if (faceRectView != null) {
-                    val drawInfoList: MutableList<DrawInfo> =
-                        ArrayList()
-                    for (i in faceInfoList.indices) {
+                val drawInfoList: MutableList<DrawInfo> =
+                    ArrayList()
+                for (i in faceInfoList.indices) {
 
-                        drawInfoList.add(
-                            DrawInfo(
-                                drawHelper.adjustRect(
-                                    faceInfoList[i].rect
-                                ),
-                                genderInfoList[i].gender,
-                                ageInfoList[i].age,
-                                faceLivenessInfoList[i].liveness,
-                                if (faceHelper.getName(faceInfoList[i].faceId) == null) RecognizeColor.COLOR_UNKNOWN else RecognizeColor.COLOR_SUCCESS,
-                                faceHelper.getName(faceInfoList[i].faceId)
-                            )
+                    drawInfoList.add(
+                        DrawInfo(
+                            drawHelper.adjustRect(
+                                faceInfoList[i].rect
+                            ),
+                            genderInfoList[i].gender,
+                            ageInfoList[i].age,
+                            faceLivenessInfoList[i].liveness,
+                            if (faceHelper.getName(faceInfoList[i].faceId) == null) RecognizeColor.COLOR_UNKNOWN else RecognizeColor.COLOR_SUCCESS,
+                            faceHelper.getName(faceInfoList[i].faceId)
                         )
-                        keyboardHandler.removeCallbacksAndMessages(null)
-                    }
-                    if (detectQrCode) {
-                        drawInfoList.add(
-                            DrawInfo(
-                                rect = Rect(
-                                    100, 280, 540, 680
-                                ),
-                                age = 0,
-                                liveness = 0,
-                                sex = 0,
-                                color = RecognizeColor.COLOR_FAILED,
-                                name = "请对准扫描区域"
-                            )
-                        )
-                    }
-                    drawHelper.draw(faceRectView, drawInfoList)
+                    )
+                    keyboardHandler.removeCallbacksAndMessages(null)
                 }
+                if (detectQrCode) {
+                    drawInfoList.add(
+                        DrawInfo(
+                            rect = Rect(
+                                100, 280, 540, 680
+                            ),
+                            age = 0,
+                            liveness = 0,
+                            sex = 0,
+                            color = RecognizeColor.COLOR_FAILED,
+                            name = "请对准扫描区域"
+                        )
+                    )
+                }
+                drawHelper.draw(faceRectView, drawInfoList)
 
             }
 
@@ -574,8 +570,8 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
         cameraHelper = CameraHelper.Builder()
             .previewViewSize(
                 Point(
-                    previewView!!.measuredWidth,
-                    previewView!!.measuredHeight
+                    previewView.measuredWidth,
+                    previewView.measuredHeight
                 )
             )
             .rotation(windowManager.defaultDisplay.rotation)
@@ -613,12 +609,10 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
      * 处理预览数据
      */
     @Synchronized
-    private fun processPreviewData(rgbData:ByteArray) {
+    private fun processPreviewData(rgbData: ByteArray) {
         rgbData.apply {
             val cloneNv21Rgb: ByteArray = this.clone()
-            if (faceRectView != null) {
-                faceRectView!!.clearFaceInfo()
-            }
+            faceRectView.clearFaceInfo()
             val facePreviewInfoList: List<FacePreviewInfo>? =
                 faceHelper.onPreviewFrame(cloneNv21Rgb)
             if (!facePreviewInfoList.isNullOrEmpty() && ::previewSize.isInitialized) {
