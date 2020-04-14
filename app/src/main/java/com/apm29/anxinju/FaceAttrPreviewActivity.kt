@@ -1,18 +1,17 @@
 package com.apm29.anxinju
 
 import android.annotation.SuppressLint
-import android.app.Service
-import android.content.*
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ActivityInfo
-import android.graphics.Bitmap
 import android.graphics.Point
 import android.graphics.Rect
 import android.hardware.Camera
 import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
-import android.os.IBinder
-import android.renderscript.*
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.View
@@ -46,26 +45,20 @@ import com.apm29.anxinju.widget.FaceRectView
 import com.arcsoft.face.*
 import com.arcsoft.face.enums.DetectFaceOrientPriority
 import com.arcsoft.face.enums.DetectMode
-import com.arcsoft.imageutil.ArcSoftImageFormat
-import com.arcsoft.imageutil.ArcSoftImageUtil
-import com.arcsoft.imageutil.ArcSoftImageUtilError
-import com.arcsoft.imageutil.ArcSoftRotateDegree
 import com.common.pos.api.util.PosUtil
-import com.spark.zj.comcom.serial.lastSixHex
-import com.spark.zj.comcom.serial.toHexString
 import io.reactivex.Observable
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
 import kotlinx.android.synthetic.main.activity_face_attr_preview.*
-import kotlinx.coroutines.*
-import okhttp3.MediaType
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import java.io.File
-import java.io.FileOutputStream
-import java.io.IOException
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -347,8 +340,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
                         previewSize.height,
                         previewView!!.width,
                         previewView!!.height,
-                        displayOrientation
-                        ,
+                        displayOrientation,
                         cameraId,
                         isMirror,
                         false,
