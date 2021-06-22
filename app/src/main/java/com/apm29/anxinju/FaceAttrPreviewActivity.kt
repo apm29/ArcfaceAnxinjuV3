@@ -104,7 +104,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
 
     private var afCode = -1
     private val processMask =
-        FaceEngine.ASF_AGE or FaceEngine.ASF_FACE3DANGLE or FaceEngine.ASF_GENDER or FaceEngine.ASF_LIVENESS
+        FaceEngine.ASF_AGE or FaceEngine.ASF_FACE3DANGLE or FaceEngine.ASF_GENDER //or FaceEngine.ASF_LIVENESS
 
     /**
      * 相机预览显示的控件，可为SurfaceView或TextureView
@@ -177,7 +177,7 @@ class FaceAttrPreviewActivity : BaseActivity(), CoroutineScope {
             DetectFaceOrientPriority.ASF_OP_90_ONLY,
             16,
             20,
-            FaceEngine.ASF_FACE_DETECT or FaceEngine.ASF_AGE or FaceEngine.ASF_FACE3DANGLE or FaceEngine.ASF_GENDER or FaceEngine.ASF_LIVENESS
+            FaceEngine.ASF_FACE_DETECT or FaceEngine.ASF_AGE or FaceEngine.ASF_FACE3DANGLE or FaceEngine.ASF_GENDER// or FaceEngine.ASF_LIVENESS
         )
         Log.i(Companion.TAG, "initEngine:  init: $afCode")
         if (afCode != ErrorInfo.MOK) {
